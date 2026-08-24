@@ -44,6 +44,7 @@ three-pane API reference generated from `openapi.json`.
   - [Change an order's status](#change-an-orders-status)
 - [The completion callback (webhook)](#the-completion-callback-webhook)
   - [Testing the callback (Write Back Test tool)](#testing-the-callback-write-back-test-tool)
+  - [Polling instead of a callback](#polling-instead-of-a-callback)
 - [Providing content: Groups vs Files](#providing-content-groups-vs-files)
 - [Reference values](#reference-values)
 - [Errors](#errors)
@@ -492,6 +493,22 @@ employee can grant it to your account — just ask your Supertext contact.
 > the endpoint you want to exercise, then use the tool to (re)send the writeback as
 > often as you need while you build and debug.
 
+### Polling instead of a callback
+
+If you can't expose a public callback endpoint — i.e. writeback isn't possible in your
+environment — you can **poll for completion** instead:
+
+1. Create the order with **`ReferenceData` and `CallbackUrl` left empty.** When you
+   poll you need neither a webhook URL nor a signed correlation token, so it's cleaner
+   to omit both.
+2. Poll [`GET /api/v1/order/{orderId}`](#get-an-order) until the order's status reaches
+   **Delivered (`8`)**, then download the `Final` (`2`) file(s).
+3. **Important — mark the order as collected yourself.** After downloading the finished
+   files, set the status to **Collected (`9`)** with
+   [`PUT /api/v1/order/status/{orderId}/9`](#change-an-orders-status). When polling,
+   Supertext does not advance the order for you, so if you skip this the order stays
+   delivered-but-uncollected.
+
 ---
 
 ## Providing content: Groups vs Files
@@ -607,8 +624,10 @@ backed by a numeric status id.
 | 9 | Collected |
 
 > **Waiting for a finished order:** either supply a `CallbackUrl` (Supertext POSTs the
-> completed order to it), or poll [`GET /api/v1/order/{orderId}`](#get-an-order) until the
-> status reaches **Delivered (8)**, then download the `Final` (2) file(s).
+> completed order to it — see [the callback](#the-completion-callback-webhook)), or
+> [poll](#polling-instead-of-a-callback) [`GET /api/v1/order/{orderId}`](#get-an-order)
+> until the status reaches **Delivered (8)**, then download the `Final` (2) file(s). When
+> polling, remember to mark the order **Collected (9)** yourself afterwards.
 
 ---
 
