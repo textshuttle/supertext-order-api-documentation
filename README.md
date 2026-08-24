@@ -43,6 +43,7 @@ three-pane API reference generated from `openapi.json`.
   - [List the current person's orders](#list-the-current-persons-orders)
   - [Change an order's status](#change-an-orders-status)
 - [The completion callback (webhook)](#the-completion-callback-webhook)
+  - [Testing the callback (Write Back Test tool)](#testing-the-callback-write-back-test-tool)
 - [Providing content: Groups vs Files](#providing-content-groups-vs-files)
 - [Reference values](#reference-values)
 - [Errors](#errors)
@@ -449,6 +450,10 @@ Key points:
   [`GET /storage/file/{fileId}/{fileName}`](#download-a-file).
 - Respond `2xx` to acknowledge receipt.
 
+> **Want to test your callback handler?** You can trigger a writeback for one of your
+> orders on demand — without waiting for a live order to be translated — with the
+> [Write Back Test tool](#testing-the-callback-write-back-test-tool).
+
 **Example callback body**
 
 ```json
@@ -464,6 +469,28 @@ Key points:
   ]
 }
 ```
+
+### Testing the callback (Write Back Test tool)
+
+While building your integration you usually want to trigger the completion callback
+**on demand**, instead of waiting for a real order to be translated and delivered.
+Supertext provides a **Write Back Test** tool for exactly that:
+
+<https://staging.supertext.com/services/tools/WriteBackTest>
+
+From there you can fire the completion callback for one of your orders yourself, so you
+can verify end-to-end that your endpoint:
+
+1. authenticates / correlates the call via your `ReferenceData`,
+2. downloads the `Final` file, and
+3. writes the translation back into your system correctly.
+
+**Access.** The tool requires the special **`API Developer`** role. Any Supertext IT
+employee can grant it to your account — just ask your Supertext contact.
+
+> This is a staging tool for integration testing: point your order's `CallbackUrl` at
+> the endpoint you want to exercise, then use the tool to (re)send the writeback as
+> often as you need while you build and debug.
 
 ---
 
