@@ -43,6 +43,8 @@ three-pane API reference generated from `openapi.json`.
   - [List the current person's orders](#list-the-current-persons-orders)
   - [Change an order's status](#change-an-orders-status)
 - [The completion callback (webhook)](#the-completion-callback-webhook)
+  - [Testing the callback (Write Back Test tool)](#testing-the-callback-write-back-test-tool)
+  - [Polling instead of a callback](#polling-instead-of-a-callback)
 - [Providing content: Groups vs Files](#providing-content-groups-vs-files)
 - [Reference values](#reference-values)
 - [Errors](#errors)
@@ -449,6 +451,10 @@ Key points:
   [`GET /storage/file/{fileId}/{fileName}`](#download-a-file).
 - Respond `2xx` to acknowledge receipt.
 
+> **Want to test your callback handler?** You can trigger a writeback for one of your
+> orders on demand — without waiting for a live order to be translated — with the
+> [Write Back Test tool](#testing-the-callback-write-back-test-tool).
+
 **Example callback body**
 
 ```json
@@ -464,6 +470,44 @@ Key points:
   ]
 }
 ```
+
+### Testing the callback (Write Back Test tool)
+
+While building your integration you usually want to trigger the completion callback
+**on demand**, instead of waiting for a real order to be translated and delivered.
+Supertext provides a **Write Back Test** tool for exactly that:
+
+<https://staging.supertext.com/services/tools/WriteBackTest>
+
+From there you can fire the completion callback for one of your orders yourself, so you
+can verify end-to-end that your endpoint:
+
+1. authenticates / correlates the call via your `ReferenceData`,
+2. downloads the `Final` file, and
+3. writes the translation back into your system correctly.
+
+**Access.** The tool requires the special **`API Developer`** role. Any Supertext IT
+employee can grant it to your account — just ask your Supertext contact.
+
+> This is a staging tool for integration testing: point your order's `CallbackUrl` at
+> the endpoint you want to exercise, then use the tool to (re)send the writeback as
+> often as you need while you build and debug.
+
+### Polling instead of a callback
+
+If you can't expose a public callback endpoint — i.e. writeback isn't possible in your
+environment — you can **poll for completion** instead:
+
+1. Create the order with **`ReferenceData` and `CallbackUrl` left empty.** When you
+   poll you need neither a webhook URL nor a signed correlation token, so it's cleaner
+   to omit both.
+2. Poll [`GET /api/v1/order/{orderId}`](#get-an-order) until the order's status reaches
+   **Delivered (`8`)**, then download the `Final` (`2`) file(s).
+3. **Important — mark the order as collected yourself.** After downloading the finished
+   files, set the status to **Collected (`9`)** with
+   [`PUT /api/v1/order/status/{orderId}/9`](#change-an-orders-status). When polling,
+   Supertext does not advance the order for you, so if you skip this the order stays
+   delivered-but-uncollected.
 
 ---
 
@@ -580,8 +624,10 @@ backed by a numeric status id.
 | 9 | Collected |
 
 > **Waiting for a finished order:** either supply a `CallbackUrl` (Supertext POSTs the
-> completed order to it), or poll [`GET /api/v1/order/{orderId}`](#get-an-order) until the
-> status reaches **Delivered (8)**, then download the `Final` (2) file(s).
+> completed order to it — see [the callback](#the-completion-callback-webhook)), or
+> [poll](#polling-instead-of-a-callback) [`GET /api/v1/order/{orderId}`](#get-an-order)
+> until the status reaches **Delivered (8)**, then download the `Final` (2) file(s). When
+> polling, remember to mark the order **Collected (9)** yourself afterwards.
 
 ---
 
