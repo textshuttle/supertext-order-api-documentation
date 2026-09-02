@@ -605,7 +605,7 @@ An older service-type selector used by the **[quote](#get-a-quote)** endpoint
 | `ElementTypeId` | `2` | File |
 | `DocumentTypeId` | `1` | Document type — `1` = original document to translate, `3` = reference file (e.g. screenshot) |
 
-### `DocumentType` (in responses)
+### `DocumentTypes`
 
 | Id | Value | Meaning |
 |----|-------|---------|
