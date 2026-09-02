@@ -300,7 +300,7 @@ confirmation email.
 | `ContentType` | string | – | e.g. `"text/html"`. |
 | `CallbackUrl` | string | – | URL Supertext `POST`s to on completion. See [callback](#the-completion-callback-webhook). |
 | `ReferenceData` | string | – | Opaque correlation string, echoed back in the callback. |
-| `Links` | array | – | Reference links for the translator: `{ "Url", "Comment" }`. |
+| `Links` | array | – | Reference links that give the translator context (not translated). See [Reference links](#reference-links-links). |
 | `AdditionalInformation` | string | – | Free-text instructions for the translator. |
 | `Currency` | string | – | e.g. `"chf"`. |
 | `Deadline` | string | – | ISO-8601 desired deadline. |
@@ -331,6 +331,21 @@ object's `Id` is the **OrderId**; store it to reconcile the callback later.
 [
   { "Id": 715113, "TargetLang": "fr-CH", "Status": "New", "ReferenceData": "ticket-4711" },
   { "Id": 715114, "TargetLang": "en-US", "Status": "New", "ReferenceData": "ticket-4711" }
+]
+```
+
+#### Reference links (`Links`)
+
+Optionally attach one or more reference URLs that give the translator background or
+context for the text. These links are **not** translated — they're just supporting
+material. Each entry has a `Url` and an optional `Comment`.
+
+```json
+"Links": [
+  {
+    "Url": "http://en.wikipedia.org/wiki/Amalfi_Cathedral",
+    "Comment": "Background to the text"
+  }
 ]
 ```
 
