@@ -37,6 +37,7 @@ three-pane API reference generated from `openapi.json`.
   - [Get a quote](#get-a-quote)
   - [Create an order](#create-an-order)
   - [Get an order](#get-an-order)
+  - [Update an order](#update-an-order)
   - [List files for an order](#list-files-for-an-order)
   - [Download a file](#download-a-file)
   - [Provide feedback / reject an order](#provide-feedback--reject-an-order)
@@ -365,6 +366,102 @@ curl -u "$EMAIL:$KEY" https://staging.supertext.com/api/v1/order/715113
 
 The response includes the order's `Status` and a `Files` array; completed
 translations appear with `DocumentType: "Final"`.
+
+---
+
+### Update an order
+
+Change the briefing, the requested deadline or the delivery speed of an order that
+already exists, with a [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
+document.
+
+```
+PATCH /api/v1/order/{orderId}
+```
+
+> **Access.** This endpoint requires the internal **`Administrator`** role. A standard
+> Order API account (role `Customer`) gets **`401 Unauthorized`** — ask your Supertext
+> contact if your integration needs to change orders after creating them.
+
+**Body** — a JSON **array** of operations. Use `op: "replace"`; `path` is a slash plus
+the property name in PascalCase, exactly as
+[`GET /api/v1/order/{orderId}`](#get-an-order) returns it.
+
+```json
+[
+  { "op": "replace", "path": "/OrderName", "value": "Homepage translation (rev 2)" },
+  { "op": "replace", "path": "/AdditionalInformation", "value": "Keep the product names in English." }
+]
+```
+
+**Fields you can update**
+
+| Path | Type | What it changes |
+|------|------|-----------------|
+| `/OrderName` | string (≤ 100) | The order title shown in Supertext and on the invoice. |
+| `/AdditionalInformation` | string | Free-text instructions for the translator. |
+| `/Background` | string | Background and purpose of the text. |
+| `/TargetAudience` | string | Who will read the translation. |
+| `/CostCenter` | string (≤ 100) | Your cost centre, carried onto the invoice. |
+| `/Deadline` | string | Requested delivery date, ISO-8601 — see [Deadlines](#deadlines) below. |
+| `/DeliveryId` | int | Delivery speed — see [`DeliveryId`](#deliveryid). |
+| `/IndustryId` | int | Subject area. Valid ids: `GET /api/v1/util/industries`. |
+| `/TextTypeId` | int | Text type. Valid ids: `GET /api/v1/util/texttype`. |
+| `/TextStyleId` | int | Writing style. Ids are product-specific — ask Supertext. |
+| `/Links` | array | Reference links (`{ "Url", "Comment" }`) — see [Reference links](#reference-links-links). Replaces the **whole** list. |
+
+Anything else you send is **accepted and silently ignored** — a `204` does not mean the
+value was stored. In particular `CallbackUrl`, `ReferenceData`, `ContentType`, `Groups`
+and `Files` cannot be changed once the order has been created, and the order's status
+has [its own endpoint](#change-an-orders-status). The language pair, the product
+(`OrderTypeConfigurationId`) and the price are not supported here either — they affect
+pricing and the production workflow, so ask Supertext to change those.
+
+#### Deadlines
+
+`/Deadline` takes an ISO-8601 timestamp, e.g. `2026-07-20T10:00:00Z`. A string the
+server cannot parse as a date **clears** the deadline rather than failing, so send the
+same format you get back from `GET`.
+
+To let Supertext work the deadline out instead of naming one, add the special
+`/RecalculateDeadline` operation — the deadline is then recomputed from the order's
+delivery option, respecting business hours and the responsible tenant's timezone:
+
+```json
+[
+  { "op": "replace", "path": "/DeliveryId", "value": 3 },
+  { "op": "replace", "path": "/RecalculateDeadline", "value": true }
+]
+```
+
+`/RecalculateDeadline` is not a field on the order — only the presence of the operation
+matters, and it overrides any `/Deadline` sent in the same request.
+
+> **Changing the delivery speed does not reprice the order**, and it does not reschedule
+> work that is already in production. Every change is written to the order's history, but
+> nobody is notified — for a change to an order that is already being translated, contact
+> Supertext.
+
+**Responses**
+
+| Status | Meaning |
+|--------|---------|
+| `204 No Content` | The patch was applied. |
+| `400 Bad Request` | The patch could not be applied — e.g. a price change on an order that has already been billed, or an unknown language code. |
+| `401 Unauthorized` | Credentials rejected, or the account does not have the required role. |
+| `404 Not Found` | No order was updated. |
+| `409 Conflict` | The patch tried to change `/Id`. |
+| `500` | The order id does not exist, `path` is not a property of the order, or the update failed. |
+
+```bash
+curl -u "$EMAIL:$KEY" \
+  -H "Content-Type: application/json; charset=UTF-8" \
+  -X PATCH https://staging.supertext.com/api/v1/order/715113 \
+  -d '[
+    { "op": "replace", "path": "/CostCenter", "value": "CC-4711" },
+    { "op": "replace", "path": "/Deadline", "value": "2026-07-20T10:00:00Z" }
+  ]'
+```
 
 ---
 
