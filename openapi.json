@@ -251,7 +251,7 @@
       "patch": {
         "tags": ["Orders"],
         "summary": "Update an order",
-        "description": "Change the briefing, the requested deadline or the delivery speed of an order that already exists, using an RFC 6902 JSON Patch document. The body is an array of operations; `path` is a slash plus the property name in PascalCase, exactly as `GET /api/v1/order/{orderId}` returns it.\n\n**Access**\n\nThis endpoint requires the internal `Administrator` role. A standard Order API account (role `Customer`) receives `401 Unauthorized`. Ask your Supertext contact if your integration needs to change orders after creating them.\n\n**Paths that can be updated**\n\n- `/OrderName` (string, max 100 characters) - the order title shown in Supertext and on the invoice.\n- `/AdditionalInformation` (string) - free-text instructions for the translator.\n- `/Background` (string) - background and purpose of the text.\n- `/TargetAudience` (string) - who will read the translation.\n- `/CostCenter` (string, max 100 characters) - your cost centre, carried onto the invoice.\n- `/Deadline` (string) - requested delivery date, ISO 8601, e.g. `2026-07-20T10:00:00Z`. A value that cannot be parsed as a date clears the deadline.\n- `/DeliveryId` (integer) - delivery speed: 1 Express, 2 24 hours, 3 48 hours, 4 3 days, 5 1 week.\n- `/IndustryId` (integer) - subject area. Valid ids: `GET /api/v1/util/industries`.\n- `/TextTypeId` (integer) - text type. Valid ids: `GET /api/v1/util/texttype`.\n- `/TextStyleId` (integer) - writing style. Ids are product specific - ask Supertext.\n- `/Links` (array of `{ Url, Comment }`) - reference links for the translator. Replaces the whole list.\n- `/RecalculateDeadline` - not a field on the order: including this operation makes Supertext recompute `Deadline` from the order's delivery option, respecting business hours. It overrides any `/Deadline` sent in the same request.\n\n**Important**\n\n- Changing `/DeliveryId` or `/Deadline` does **not** reprice the order, and does not reschedule work that is already in production.\n- Any other property of the order object is accepted and silently ignored - a `204` does not mean the value was stored. `CallbackUrl`, `ReferenceData`, `ContentType`, `Groups` and `Files` cannot be changed after the order is created, and the status has its own endpoint (`PUT /api/v1/order/status/{orderId}/{statusId}`).\n- Every change is written to the order's history, but nobody is notified. For a change to an order that is already being translated, contact Supertext.",
+        "description": "Change the briefing, the requested deadline or the delivery speed of an order that already exists, using an RFC 6902 JSON Patch document. The body is an array of operations; `path` is a slash plus the property name in PascalCase, exactly as `GET /api/v1/order/{orderId}` returns it.\n\n**Access**\n\nWith a standard Order API account you can update the cost centre of your own orders. The other paths below are writable through the same endpoint but need the internal `Administrator` role, so your account receives `403 Forbidden` for them. Ask your Supertext contact if you need one of those changed.\n\nOn your own account use only `replace`, `add` or `remove`. `move` and `copy` are rejected with `403`, because their `from` path would reach a field you may not change.\n\n**Paths you can update**\n\n- `/CostCenter` (string, max 100 characters) - your cost centre, carried onto the invoice.\n\n**Paths that need the Administrator role**\n\n- `/OrderName` (string, max 100 characters) - the order title shown in Supertext and on the invoice.\n- `/AdditionalInformation` (string) - free-text instructions for the translator.\n- `/Background` (string) - background and purpose of the text.\n- `/TargetAudience` (string) - who will read the translation.\n- `/Deadline` (string) - requested delivery date, ISO 8601, e.g. `2026-07-20T10:00:00Z`. A value that cannot be parsed as a date clears the deadline.\n- `/DeliveryId` (integer) - delivery speed: 1 Express, 2 24 hours, 3 48 hours, 4 3 days, 5 1 week.\n- `/IndustryId` (integer) - subject area. Valid ids: `GET /api/v1/util/industries`.\n- `/TextTypeId` (integer) - text type. Valid ids: `GET /api/v1/util/texttype`.\n- `/TextStyleId` (integer) - writing style. Ids are product specific - ask Supertext.\n- `/Links` (array of `{ Url, Comment }`) - reference links for the translator. Replaces the whole list.\n- `/RecalculateDeadline` - not a field on the order: including this operation makes Supertext recompute `Deadline` from the order's delivery option, respecting business hours. It overrides any `/Deadline` sent in the same request.\n\n**Important**\n\n- Changing `/DeliveryId` or `/Deadline` does **not** reprice the order, and does not reschedule work that is already in production.\n- Only the paths above are written to the order. On a standard account anything else is rejected with `403`; with the `Administrator` role an unlisted property is instead accepted and silently ignored - a `204` does not mean the value was stored. Either way `CallbackUrl`, `ReferenceData`, `ContentType`, `Groups` and `Files` cannot be changed after the order is created, and the status has its own endpoint (`PUT /api/v1/order/status/{orderId}/{statusId}`).\n- Every change is written to the order's history, but nobody is notified. For a change to an order that is already being translated, contact Supertext.",
         "operationId": "patchOrder",
         "parameters": [ { "$ref": "#/components/parameters/OrderId" } ],
         "requestBody": {
@@ -260,9 +260,7 @@
             "application/json": {
               "schema": { "$ref": "#/components/schemas/OrderPatch" },
               "example": [
-                { "op": "replace", "path": "/OrderName", "value": "Homepage translation (rev 2)" },
-                { "op": "replace", "path": "/AdditionalInformation", "value": "Keep the product names in English." },
-                { "op": "replace", "path": "/Deadline", "value": "2026-07-20T10:00:00Z" }
+                { "op": "replace", "path": "/CostCenter", "value": "CC-4711" }
               ]
             }
           }
@@ -271,6 +269,7 @@
           "204": { "description": "The patch was applied." },
           "400": { "description": "The patch could not be applied - for example a price change on an order that has already been billed, or an unknown language code." },
           "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "description": "The patch touches a field the account may not update, uses move or copy, or the order does not belong to the account. Nothing is changed." },
           "404": { "description": "No order was updated." },
           "409": { "description": "The patch tried to change /Id, which is not permitted." },
           "500": { "description": "The order id does not exist, path is not a property of the order, or the update failed." }
@@ -492,7 +491,7 @@
               "/Links",
               "/RecalculateDeadline"
             ],
-            "example": "/OrderName"
+            "example": "/CostCenter"
           },
           "value": { "description": "The new value; its type depends on the field being replaced.", "example": "Homepage translation (rev 2)" }
         }

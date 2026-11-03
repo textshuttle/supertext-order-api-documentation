@@ -371,17 +371,17 @@ translations appear with `DocumentType: "Final"`.
 
 ### Update an order
 
-Change the briefing, the requested deadline or the delivery speed of an order that
-already exists, with a [JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
-document.
+Update a field of an order that already exists, with a
+[JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902) document.
 
 ```
 PATCH /api/v1/order/{orderId}
 ```
 
-> **Access.** This endpoint requires the internal **`Administrator`** role. A standard
-> Order API account (role `Customer`) gets **`401 Unauthorized`** — ask your Supertext
-> contact if your integration needs to change orders after creating them.
+> **Access.** With a standard Order API account you can update the **cost centre** of
+> your own orders. The other fields below are writable through the same endpoint, but
+> need the internal **`Administrator`** role — your account gets **`403 Forbidden`** for
+> them, so ask your Supertext contact if you need one of those changed.
 
 **Body** — a JSON **array** of operations. Use `op: "replace"`; `path` is a slash plus
 the property name in PascalCase, exactly as
@@ -389,35 +389,42 @@ the property name in PascalCase, exactly as
 
 ```json
 [
-  { "op": "replace", "path": "/OrderName", "value": "Homepage translation (rev 2)" },
-  { "op": "replace", "path": "/AdditionalInformation", "value": "Keep the product names in English." }
+  { "op": "replace", "path": "/CostCenter", "value": "CC-4711" }
 ]
 ```
 
-**Fields you can update**
+**Fields**
 
-| Path | Type | What it changes |
-|------|------|-----------------|
-| `/OrderName` | string (≤ 100) | The order title shown in Supertext and on the invoice. |
-| `/AdditionalInformation` | string | Free-text instructions for the translator. |
-| `/Background` | string | Background and purpose of the text. |
-| `/TargetAudience` | string | Who will read the translation. |
-| `/CostCenter` | string (≤ 100) | Your cost centre, carried onto the invoice. |
-| `/Deadline` | string | Requested delivery date, ISO-8601 — see [Deadlines](#deadlines) below. |
-| `/DeliveryId` | int | Delivery speed — see [`DeliveryId`](#deliveryid). |
-| `/IndustryId` | int | Subject area. Valid ids: `GET /api/v1/util/industries`. |
-| `/TextTypeId` | int | Text type. Valid ids: `GET /api/v1/util/texttype`. |
-| `/TextStyleId` | int | Writing style. Ids are product-specific — ask Supertext. |
-| `/Links` | array | Reference links (`{ "Url", "Comment" }`) — see [Reference links](#reference-links-links). Replaces the **whole** list. |
+| Path | Type | Who can update it | What it changes |
+|------|------|-------------------|-----------------|
+| `/CostCenter` | string (≤ 100) | **You** | Your cost centre, carried onto the invoice. |
+| `/OrderName` | string (≤ 100) | Supertext | The order title shown in Supertext and on the invoice. |
+| `/AdditionalInformation` | string | Supertext | Free-text instructions for the translator. |
+| `/Background` | string | Supertext | Background and purpose of the text. |
+| `/TargetAudience` | string | Supertext | Who will read the translation. |
+| `/Deadline` | string | Supertext | Requested delivery date, ISO-8601 — see [Deadlines](#deadlines) below. |
+| `/DeliveryId` | int | Supertext | Delivery speed — see [`DeliveryId`](#deliveryid). |
+| `/IndustryId` | int | Supertext | Subject area. Valid ids: `GET /api/v1/util/industries`. |
+| `/TextTypeId` | int | Supertext | Text type. Valid ids: `GET /api/v1/util/texttype`. |
+| `/TextStyleId` | int | Supertext | Writing style. Ids are product-specific — ask Supertext. |
+| `/Links` | array | Supertext | Reference links (`{ "Url", "Comment" }`) — see [Reference links](#reference-links-links). Replaces the **whole** list. |
 
-Anything else you send is **accepted and silently ignored** — a `204` does not mean the
-value was stored. In particular `CallbackUrl`, `ReferenceData`, `ContentType`, `Groups`
-and `Files` cannot be changed once the order has been created, and the order's status
-has [its own endpoint](#change-an-orders-status). The language pair, the product
+On your own account, use only `op: "replace"`, `"add"` or `"remove"`. `"move"` and
+`"copy"` are rejected with `403`, because their `from` path would reach a field you may
+not change.
+
+Only the fields above are written to the order. On your own account anything else is
+rejected with `403`; with the `Administrator` role an unlisted property is instead
+**accepted and silently ignored** — a `204` does not mean the value was stored. Either
+way, `CallbackUrl`, `ReferenceData`, `ContentType`, `Groups` and `Files` cannot be
+changed once the order has been created, and the order's status has
+[its own endpoint](#change-an-orders-status). The language pair, the product
 (`OrderTypeConfigurationId`) and the price are not supported here either — they affect
 pricing and the production workflow, so ask Supertext to change those.
 
 #### Deadlines
+
+Both fields in this section need the `Administrator` role.
 
 `/Deadline` takes an ISO-8601 timestamp, e.g. `2026-07-20T10:00:00Z`. A string the
 server cannot parse as a date **clears** the deadline rather than failing, so send the
@@ -448,7 +455,8 @@ matters, and it overrides any `/Deadline` sent in the same request.
 |--------|---------|
 | `204 No Content` | The patch was applied. |
 | `400 Bad Request` | The patch could not be applied — e.g. a price change on an order that has already been billed, or an unknown language code. |
-| `401 Unauthorized` | Credentials rejected, or the account does not have the required role. |
+| `401 Unauthorized` | Credentials rejected. |
+| `403 Forbidden` | The patch touches a field you may not update, uses `move`/`copy`, or the order is not one of yours. Nothing is changed. |
 | `404 Not Found` | No order was updated. |
 | `409 Conflict` | The patch tried to change `/Id`. |
 | `500` | The order id does not exist, `path` is not a property of the order, or the update failed. |
@@ -458,8 +466,7 @@ curl -u "$EMAIL:$KEY" \
   -H "Content-Type: application/json; charset=UTF-8" \
   -X PATCH https://staging.supertext.com/api/v1/order/715113 \
   -d '[
-    { "op": "replace", "path": "/CostCenter", "value": "CC-4711" },
-    { "op": "replace", "path": "/Deadline", "value": "2026-07-20T10:00:00Z" }
+    { "op": "replace", "path": "/CostCenter", "value": "CC-4711" }
   ]'
 ```
 
